@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Projet Synesthéorie : Interface interactive.</title>
+		<meta charset="utf-8"/>    
+		<meta name="viewport" content='width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0' /> 
+        <link rel="stylesheet" href="tinybox2/styletiny.css" />   
+		<link href="css/main.css" rel="stylesheet" />
+        
+        <script>
+        function OninfoCredits(){ 
+			TINY.box.show({iframe:'http://synestheorie.fr/paysages-sonores/',width:1280,height:720,boxid:'frameless',animate:true,fixed:false,maskid:'blackmask',maskopacity:40 });	
+		}
+        </script>
+ 
+	</head>
+	<body>
+ 
+		<div class="mainframe">
+        <div class="containerholder">
+		<div id="container"></div>
+        <div class="containerInfo" ><button style="position:absolute;right:0;width:50%;height:100%;" onclick='OninfoCredits();'>Info / Credits</button></div>
+        
+        
+		<div class="containerMenu" >
+        <div id="slider-rugueux" ></div>
+        <div id="slider-depth" ></div>
+        <button class="button_position" onClick="OnPosition();"></button>
+        <button class="button_scale" onClick="OnScale();"></button>        
+        <button class="button_play" onClick="OnPlay();"></button>
+        <button class="button_rugeux" onClick="OnRugeux();" ></button>
+        <button class="button_color" onClick="OnColor();"></button>
+		</div>
+        <div id="ColorPickerDiv" class="containerMenuColorSelector" ><canvas id="CanvasColorPicker"></canvas></div>                
+        </div>
+
+        <div class="bottomframe"> 
+        <ul class="menubottomframe">
+            <li><a><img class="drag" attr="0" src="images/menu_icon0.png" /></a></li>
+            <li><a><img class="drag" attr="1" src="images/menu_icon1.png" /></a></li>
+            <li><a><img class="drag" attr="2" src="images/menu_icon2.png" /></a></li>
+            <li><a><img class="drag" attr="3" src="images/menu_icon3.png" /></a></li>
+            <li><a><img class="drag" attr="4" src="images/menu_icon4.png" /></a></li>
+            <li><a><img class="drag" attr="5" src="images/menu_icon5.png" /></a></li>
+            <li><a><img class="drag" attr="6" src="images/menu_icon6.png" /></a></li>
+            <li><a><img class="drag" attr="7" src="images/menu_icon7.png" /></a></li>
+            <li><a><img class="delete" attr="8" src="images/menu_icon8.png" /></a></li>
+        </ul>
+        </div>
+        
+        </div>
+        
+        
+	
+	<script type="text/javascript" src="tinybox2/tinybox.js"></script>
+        
+	<script src="js/SonoreDsp.js"></script>
+	<script src="js/SonorePitchShift.js"></script>
+	<script src="build/three.min.js"></script>
+	<script src="js/controls/FirstPersonControls.js"></script>
+	<script src="js/SonoreUVGenerator.js"></script> <!-- uv shapes -->
+    <script type="text/javascript" src="js/UVsUtils.js"></script>
+	<script src="js/Detector.js"></script>
+    <script src="js/libs/tween.min.js"></script>
+    <!--  <script src="js/libs/jquery-1.10.2.min.js"></script> -->
+    
+    
+    <!-- mobile touch -->
+	<script src="js/jquery-1.7.2.min.js"></script> <!-- newer version of jquery break the mobile draganddrop -->
+	<script src="js/jquery-ui-1.8.21.min.js"></script>    
+	<script src="js/SonoreTouchPunch.js"></script><!-- needed for drag and drop on mobiles -->
+   
+	<!-- NxSources -->
+    <script src="srcjs/NxSoundEngine.js"></script>
+    <script src="srcjs/NxEntity3D.js"></script>
+    <script src="srcjs/NxSound3D.js"></script>    
+    <script src="srcjs/NxVideo3D.js"></script>  
+    
+    
+	<script type="x-shader/x-vertex" id="vertexshader">
+
+        void main() {
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+
+		</script>
+
+		<script type="x-shader/x-fragment" id="fragmentshader">
+
+		uniform float u_aspectRatio;
+        uniform float u_time;
+        uniform vec2  u_resolution;
+
+        void main() 
+        {
+            vec2 p = -1.0 + 2.0*(gl_FragCoord.xy/u_resolution);
+
+            // cheapest trick in the book #1: tunnel
+            float r = sqrt(dot(p, p));
+            float a = atan(p.y, p.x); // abs(a)/3.1416
+            float flower = r + 0.2*sin(a*4.0 + u_time);
+
+            // cheapest trick in the book #2: 2D blobs
+            vec2 blob1 = vec2(sin(u_time*0.66), cos(u_time*0.96));
+            vec2 blob2 = vec2(cos(u_time*0.75 + 1.4), sin(u_time*0.4 - 3.0));
+            vec2 dist1 = p - blob1;
+            vec2 dist2 = p - blob2;
+            dist1 *= 2.0; dist2 *= 3.0;
+            float energy = 1.0/dot(dist1, dist1) + 1.0/dot(dist2, dist2);
+            energy = pow(energy, 4.0);
+
+                gl_FragColor = vec4(energy, flower, u_time, 1.0);
+        }
+
+		</script>
+    
+
+	<script>
+	
+	var mIsMobile = false;
+	
+	if( navigator.userAgent.match(/Android/i) ||
+	navigator.userAgent.match(/webOS/i) ||
+	navigator.userAgent.match(/iPhone/i) ||
+	navigator.userAgent.match(/iPod/i) ||
+	navigator.userAgent.match(/iPad/i) ){
+		mIsMobile = true;
+ 	}
+	
+	Array.prototype.remove = function(value) {
+		if(this.indexOf(value) != -1) { // Make sure the value exists
+			this.splice(this.indexOf(value), 1);
+		}   
+	}
+		
+	var mSceneWidth = 1000.0;
+	var mSceneHeight = 562.5;
+	var mSceneDepth = 500.0;//500.0;
+	var mCurrentSelectedEntity = null;
+	var isfullscreen = false;
+	
+	var mSliderRugueuxActive = false;
+	var mSliderDepthActive = false;
+	
+	var EditType =
+	{
+		TypePosition:0,
+		TypeDepth:1,
+		TypeColor:2,
+		TypeRugueux:3,
+		TypeNone:4
+	}
+	
+	var mCurrentEditType = EditType.TypePosition; 
+		
+	var OBJECTTYPES = [
+		{ type : "Crystal", index: 0, name: "Small", code: "S"}, 
+		{ type : "Toulracoulroouuu", index: 1, name: "Small", code: "S"}, 
+		{ type : "Trrrodop", index: 2, name: "Small", code: "S"}, 
+		{ type : "Doum", index: 3, name: "Small", code: "S"}, 
+		{ type : "Todetode", index: 4, name: "Small", code: "S"}, 
+		{ type : "Houmsu", index: 5, name: "Small", code: "S"}, 
+		{ type : "Tarrll", index: 6, name: "Small", code: "S"}, 
+		{ type : "Huchuhu", index: 7, name: "Small", code: "S"}
+	];	
+
+	var mCurrentDragObj = null;
+ 	
+	var dragSrcEl = null;
+	
+	function CreateElementTypeAtPos( type, posX, posY ) {
+		var pos = new THREE.Vector3();					
+		pos.x = posX;
+		pos.y = posY;
+		pos.z = -mSceneDepth;
+		mEntities.push( new Entity3D( type,/*  "sounds/376737_Skullbeatz___Bad_Cat_Maste.ogg",*/ pos ) );
+	}
+	
+	function DeleteElement( entity ) {
+		entity.Delete();
+		mEntities.remove( entity );	
+	}
+	
+	/*
+function getNumericStyleProperty(style, prop){
+    return parseInt(style.getPropertyValue(prop),10) ;
+}
+
+function element_position(e) {
+    var x = 0, y = 0;
+    var inner = true ;
+    do {
+        x += e.offsetLeft;
+        y += e.offsetTop;
+        var style = getComputedStyle(e,null) ;
+        var borderTop = getNumericStyleProperty(style,"border-top-width") ;
+        var borderLeft = getNumericStyleProperty(style,"border-left-width") ;
+        y += borderTop ;
+        x += borderLeft ;
+        if (inner){
+          var paddingTop = getNumericStyleProperty(style,"padding-top") ;
+          var paddingLeft = getNumericStyleProperty(style,"padding-left") ;
+          y += paddingTop ;
+          x += paddingLeft ;
+        }
+        inner = false ;
+    } while (e = e.offsetParent);
+    return { x: x, y: y };
+}*/
+
+	function getPosition(who){
+		
+		//var res = element_position(who);
+		//return [res.x,res.y];
+		
+		
+		var T= 0,L= 0;
+ 
+		
+		while(who){
+			L+= who.offsetLeft;
+			T+= who.offsetTop;
+			who= who.offsetParent;
+		}
+		return [L,T];  
+	}
+ 
+	function handleDragStart( e ){ 
+		var attr = this.getAttribute("attr");
+		mCurrentDragObj = OBJECTTYPES[ parseInt( attr ) ];
+	}
+		
+		
+		/*	
+	function handleDragStart(e) {
+		//this.style.opacity = '0.4'; // Target (this) element is the source node.
+		var attr = this.getAttribute("attr");
+		dragSrcEl = this;
+		e.dataTransfer.effectAllowed = 'move';
+		mCurrentDragObj = OBJECTTYPES[ parseInt( attr ) ];
+		e.dataTransfer.setData('myarray', mCurrentDragObj );//this.innerHTML); no need
+		var dragIcon = document.createElement('img');
+		dragIcon.src = 'images/drop.png';
+		dragIcon.width = 500;
+		e.dataTransfer.setDragImage(dragIcon, 0, 20);  
+	 
+	}
+	
+	
+	function handleDropMobile( e ) {
+		
+		
+		
+		console.log('received ! : ' + mCurrentDragObj.type );	
+		var cont = document.getElementById( 'container' );
+		
+		var posx = e.clientX - getPosition( cont )[0];
+		var posy = e.clientY - getPosition( cont )[1];
+		var width = cont.offsetWidth;
+		var height = cont.offsetHeight;
+		
+		var posInScreenX = ( mSceneWidth / width ) * posx;
+		var posInScreenY = ( mSceneHeight / height ) * posy;
+		CreateElementTypeAtPos( mCurrentDragObj.index , posInScreenX , height - posInScreenY - 80 ); // -80 ?
+		
+		console.log( "MOBILE ThreeJS Dropped at : X " + posInScreenX + " Y " + posInScreenY );	
+		
+	}*/
+
+	function handleDrop(e) {
+ 	
+		var cont = document.getElementById( 'container' );
+		var width = cont.offsetWidth;
+		var height = cont.offsetHeight;
+		var posx = e.clientX - getPosition( cont )[0];
+		var posy = e.clientY - getPosition( cont )[1];
+		var posInScreenX = ( mSceneWidth / width ) * posx;
+		var posInScreenY = ( mSceneHeight / height ) * posy;
+		CreateElementTypeAtPos( mCurrentDragObj.index, posInScreenX, mSceneHeight - posInScreenY ); 
+		console.log( "DOM Dropped at : X " + posx + " Y " + posy );	
+		console.log( "ThreeJS Dropped at : X " + posInScreenX + " Y " + posInScreenY );			
+		
+		
+		/*
+		// this/e.target is current target element.
+		if (e.stopPropagation) {
+			e.stopPropagation(); // Stops some browsers from redirecting.
+		}
+
+		// Don't do anything if dropping the same column we're dragging.
+		if (dragSrcEl != this) {
+			// Set the source column's HTML to the HTML of the column we dropped on.
+			// dragSrcEl.innerHTML = this.innerHTML;
+			// this.innerHTML = e.dataTransfer.getData('text/html');
+			console.log('received ! : ' + mCurrentDragObj.type );
+			 var cont = document.getElementById( 'container' );
+			var posx = e.clientX - getPosition( cont )[0];
+			var posy = e.clientY - getPosition( cont )[1];
+			var width = cont.offsetWidth;
+			var height = cont.offsetHeight;
+			var posInScreenX = ( mSceneWidth / width ) * posx;
+			var posInScreenY = ( mSceneHeight / height ) * posy; 
+ 
+			//CreateElementTypeAtPos( mCurrentDragObj.index , posInScreenX , height - posInScreenY - 80 ); // -80 ?
+			
+			CreateElementTypeAtPos( mCurrentDragObj.index , posInScreenX , posInScreenY );
+			console.log( "DOM Dropped at : X " + posx + " Y " + posy );	
+			
+			console.log( "ThreeJS Dropped at : X " + posInScreenX + " Y " + posInScreenY );	
+		}*/
+		
+		return false;
+	}	
+	
+	
+
+	function handleDragOver(e) {
+	  if (e.preventDefault) {
+		e.preventDefault(); // Necessary. Allows us to drop.
+	  }
+	  e.dataTransfer.dropEffect = 'move';  // See the section on the DataTransfer object.
+	  return false;
+	}
+
+	function handleDragEnter(e) {
+		// this / e.target is the current hover target.
+		this.classList.add('over');
+	}
+	
+	function handleDragLeave(e) {
+	  	this.classList.remove('over');  // this / e.target is previous target element.
+	}
+
+	function handleDragEnd(e) {
+		// this/e.target is the source node.
+		[].forEach.call(cols, function (col) {
+		col.classList.remove('over');
+		});
+	}
+
+
+
+	// touch | mouse bindings
+	var cols = document.querySelectorAll('.drag');
+	[].forEach.call(cols, function(col) {
+		//col.addEventListener('dragstart', handleDragStart, false);
+  		$( col ).draggable({ revert: true, scroll: false, drag: handleDragStart }); /* mobile enabled */
+	});
+ 
+	// set callbacks for delete release button
+	var deleteArea = document.querySelectorAll('.delete');
+	[].forEach.call(deleteArea, function(but) {
+		but.addEventListener('mouseup', handleIconMouseUp,false);
+		but.addEventListener('mousemove', handleIconMouseMove,false);
+ 	
+	});	
+ 
+ 	// drag / drop Events for ThreeJS Canvas
+	var DivContainer = document.getElementById( 'container' );
+	$( DivContainer ).droppable({ drop: function( event, ui ) { handleDrop(event); } });/* mobile & Desktop drop  */
+	
+	/*
+	DivContainer.addEventListener('dragenter', handleDragEnter, false);
+	DivContainer.addEventListener('dragover', handleDragOver, false);
+	DivContainer.addEventListener('dragleave', handleDragLeave, false);
+	DivContainer.addEventListener('drop', handleDrop, false);
+	DivContainer.addEventListener('dragend', handleDragEnd, false); */
+ 
+	// Color Picker Events
+	var DivColorPick = document.getElementById( 'ColorPickerDiv' );
+	DivColorPick.addEventListener('mousemove', handleColorPickerMouseMove, false);
+	DivColorPick.addEventListener('click', handleColorPickerClick, false);
+	
+ 
+	// buttons & menu
+ 
+	function SetFullScreen( full ) { // TODO !
+		if( full === true ) {
+			//$('.containerholder').css({ 'position':'absolute','width':'100%','height':'100%', 'margin':'0px', 'padding':'0px', 'border':'0px', 'z-index':1000 });
+			//$('.containerMenu').hide();
+			// onWindowResize();
+			//isfullscreen = true; 
+		}else  {
+			//$('.containerholder').css({ 'position':'relative','width':'94%','height':'73%', 'margin':'2% auto', 'padding':'0px', 'border':'3px solid #FFFFFF', 'z-index':1 });
+			//$('.containerMenu').show();
+			//onWindowResize();	
+			//isfullscreen = false;
+		}
+		
+	}
+	
+	
+	function ShowMenu( show ) {
+		if( show === true ) {
+			 $('.button_position').show();
+			 $('.button_scale').show();
+			 $('.button_rugeux').show();
+			 $('.button_color').show();	
+			$('.button_play').show();
+			if( mCurrentEditType == EditType.TypeColor )
+				$('.containerMenuColorSelector').show();
+			else
+				$('.containerMenuColorSelector').hide();
+			 //$('.containerMenu').show();		 
+		}else {
+			 $('.button_position').hide();
+			 $('.button_scale').hide();
+			 $('.button_rugeux').hide();
+			 $('.button_color').hide();	
+			 $('.button_play').show();	
+			$('.containerMenuColorSelector').hide();			 		 
+			 // $('.containerMenu').hide();	
+		}
+	}
+	
+	function UnSelectAll() {
+		
+		$('.button_position').css({ 'background':'url(images/buttons/position.png)  no-repeat' });
+		$('.button_position').css({ 'background-size':'contain' });	
+		
+		$('.button_scale').css({ 'background':'url(images/buttons/depth.png)  no-repeat' });
+		$('.button_scale').css({ 'background-size':'contain' });	
+		
+		$('.button_rugeux').css({ 'background':'url(images/buttons/rugeux.png) no-repeat' });
+		$('.button_rugeux').css({ 'background-size':'contain' });	
+			 
+		$('.button_color').css({ 'background':'url(images/buttons/color.png) no-repeat' });
+		$('.button_color').css({ 'background-size':'contain' });	
+			
+		//if( !mSliderRugueuxActive )	 
+		SetSliderRugueuxVisible( false );
+		SetSliderDepthVisible( false );
+	
+		mCurrentEditType = EditType.TypeNone;
+	}
+
+	function OnPlay() {
+		UnSelectAll();
+		SetFullScreen( true );
+		
+	}
+	
+	function SetSliderRugueuxValue( value ) {	
+		$( "#slider-rugueux" ).slider( "value", value  );
+		$( "#slider-rugueux" ).find('.ui-slider-handle').text(value);
+	}
+	
+	function SetSliderRugueuxVisible( visible ) {
+		
+		if( visible == true ){ 
+			$('#slider-rugueux').css({ 'visibility':'visible' });
+			$('#slider-rugueux').css({ 'left':'-25%' });
+			$('.containerMenu').css({ 'width':'13%' });	 
+		}
+		else{ 
+			$('#slider-rugueux').css({ 'visibility':'hidden' });
+			$('.containerMenu').css({ 'width':'16%' });
+		}
+		
+		//SetSliderDepthVisible( !visible );
+		mSliderRugueuxActive = visible;	
+	}
+	
+
+	function SetSliderDepthValue( value ) {	
+	
+		$( "#slider-depth" ).slider( "value", value  );
+		$( "#slider-depth" ).find('.ui-slider-handle').text( Math.round( value ) );
+	}
+
+	function SetSliderDepthVisible( visible ) {
+		
+		if( visible == true ){ 
+			$('#slider-depth').css({ 'visibility':'visible' });
+			$('#slider-depth').css({ 'left':'-25%' });
+			$('.containerMenu').css({ 'width':'13%' });	 
+		}else{ 
+			$('#slider-depth').css({ 'visibility':'hidden' });
+			$('.containerMenu').css({ 'width':'16%' });
+		}
+		
+		//SetSliderRugueuxVisible( !visible );
+		
+		mSliderDepthActive = visible;			
+	
+	 }	
+	
+	
+	//var mod = 0;
+	function OnPosition() {
+ 
+		UnSelectAll();
+		mCurrentEditType = EditType.TypePosition;
+		$('.button_position').css({ 'background':'url(images/buttons/positionSelected.png)  no-repeat' });	
+		$('.button_position').css({ 'background-size':'contain' });
+		
+		//console.log(' mCurrentEditType = EditType.TypePosition; ');		
+		 
+		 /*
+		 if( mod % 2 == 0 ) {
+			mCurrentEditType = EditType.TypeDepth; 
+			$('.button_position').css({ 'background':'url(images/buttons/depth.png)  no-repeat' });
+			$('.button_position').css({ 'background-size':'contain' });
+			console.log(' mCurrentEditType = EditType.TypeDepth;  '); 
+			console.log(  mCurrentEditType );	
+		 }
+		 else {
+			mCurrentEditType = EditType.TypePosition;
+			$('.button_position').css({ 'background':'url(images/buttons/position.png)  no-repeat' });	
+			$('.button_position').css({ 'background-size':'contain' }); 
+			console.log(' mCurrentEditType = EditType.TypePosition; ');
+			console.log(  mCurrentEditType );
+		  }
+		  
+		  mod++;*/
+	
+	}
+	
+	function OnScale() { 
+		UnSelectAll();
+		mCurrentEditType = EditType.TypeDepth;
+		$('.button_scale').css({ 'background':'url(images/buttons/depthSelected.png)  no-repeat' });
+		$('.button_scale').css({ 'background-size':'contain' });	
+		console.log(' mCurrentEditType = EditType.TypeDepth; ');
+		
+		
+		
+		SetSliderRugueuxVisible( false ) ;
+		SetSliderDepthVisible( true ) ;
+	}
+		
+	function OnRugeux() {
+		UnSelectAll();		
+		mCurrentEditType = EditType.TypeRugueux;
+		$('.button_rugeux').css({ 'background':'url(images/buttons/rugeuxSelected.png) no-repeat' });
+		$('.button_rugeux').css({ 'background-size':'contain' });
+		console.log(' mCurrentEditType = EditType.TypeRugueux; ');
+		
+		
+		SetSliderDepthVisible( false ) ;
+		SetSliderRugueuxVisible( true ) ;
+		 
+	}
+	
+	function OnColor() {	
+	    $('.containerMenuColorSelector').show();
+		UnSelectAll();
+		mCurrentEditType = EditType.TypeColor;
+		$('.button_color').css({ 'background':'url(images/buttons/colorSelected.png) no-repeat' });
+		$('.button_color').css({ 'background-size':'contain' });
+		console.log(' mCurrentEditType = EditType.TypeColor; ');
+ 
+		
+						
+	}		
+
+	if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
+	var container;
+	var camera, scene, renderer;
+	//raycast
+	var objects = [];
+	var objects = [], plane;
+	var mouse = new THREE.Vector2(),
+	offset = new THREE.Vector3(),
+	INTERSECTED, SELECTED;			
+
+	var light, pointLight;
+	var mesh;
+	var material_sphere1, material_sphere2;
+
+	var AudioCtx;
+	var mainVolume;
+
+	var mEntities = new Array();
+	var clock = new THREE.Clock();
+ 
+			
+	function CreateTriangleGeometry() {
+		var geo = new THREE.Geometry();
+		geo.vertices.push(new THREE.Vertex(
+		new THREE.Vector3(   0, 100, 0)));
+		geo.vertices.push(new THREE.Vertex(
+		new THREE.Vector3(-120,-100, 0)));
+		geo.vertices.push(new THREE.Vertex(
+		new THREE.Vector3( 120,-100, 0)));
+		geo.faces.push( new THREE.Face3(0, 1, 2));
+		return geo;
+	}		
+		 
+	 
+ 
+	function CreateDebugSphereAtPosition( x, y, z ){ 
+	
+		var sphere = new THREE.SphereGeometry( 20, 32, 16 );
+		matSphere = new THREE.MeshLambertMaterial( { color: 0xFF0000, shading: THREE.FlatShading } );
+		var mesh1 = new THREE.Mesh( sphere, matSphere );
+		mesh1.position.set( x,y,z );
+		mesh1.scale.set( 1,1,1 );
+		scene.add( mesh1 );
+	} 					
+
+			init();
+			animate();
+
+			function init() {
+
+				container = document.getElementById( 'container' );
+				
+				//  camera = new THREE.OrthographicCamera( 1000 / -2 , 1000 / 2 ,  562.5 / 2,  562.5 / -2, 1, 5000 );
+
+				camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 1, 10000 ); 
+				camera.rotation.y = 0;
+				camera.position.set( mSceneWidth/2,mSceneHeight/2,0 );				
+ 
+
+				scene = new THREE.Scene();
+				//scene.fog = new THREE.FogExp2( 0x000000, 0.0035 );
+				
+				new SoundEngine();
+ 
+				light = new THREE.DirectionalLight( 0xffffff );
+				light.position.set( 0, 0, 1 ).normalize();
+				scene.add( light );
+				
+				
+        		var ambientLight = new THREE.AmbientLight( 0xffffff );
+        		scene.add( ambientLight );				
+ 
+ /*
+				//bottom left
+				CreateDebugSphereAtPosition( 0, 0, -500 );
+				//bottom right
+				CreateDebugSphereAtPosition( 1000, 0, -500 );
+				//top left
+				CreateDebugSphereAtPosition( 0, 562.5, -500 );
+				//top right
+				CreateDebugSphereAtPosition( 1000, 562.5, -500 );
+				//center
+				CreateDebugSphereAtPosition( 500, mSceneHeight/2, -500 );	
+				*/		
+   
+				camera.aspect = 1000 / 562.5;
+	 
+				var Distance = mSceneDepth;//500.0;
+				// Calculate FOV H in degrees from Camera Distance.
+				var FOVRad = 2.0 *  Math.atan(( mSceneHeight / 2.0 ) / Distance );
+				var FOVDeg = FOVRad * 180.0 / Math.PI;
+				camera.fov = FOVDeg;
+				
+				camera.updateProjectionMatrix(); 
+				
+		 
+				// ground
+/*
+				var material = new THREE.MeshLambertMaterial( { color: 0x7f7566, wireframe: true, wireframeLinewidth: 1 } );
+				mesh = new THREE.Mesh( new THREE.PlaneGeometry( 500, 500, 100, 100 ), material );
+				mesh.position.x = 500;//0.1;
+				mesh.position.y = 0;//0.1;
+				mesh.position.z = 500;//0.1;
+				mesh.rotation.x = - Math.PI / 2;
+				scene.add( mesh );*/
+
+				//
+				//Raycast plane
+				plane = new THREE.Mesh( new THREE.PlaneGeometry( 2000, 2000, 8, 8 ), new THREE.MeshBasicMaterial( { color: 0x000000, opacity: 0.25, transparent: true, wireframe: true } ) );
+				plane.visible = false;
+				scene.add( plane );
+
+				projector = new THREE.Projector();
+ 
+				renderer = new THREE.WebGLRenderer( { antialias: true, alpha: false } );
+				
+				
+				//renderer = new THREE.WebGLRenderer( { antialias: false, alpha: false, precision:"lowp" } );
+				
+				 
+				
+				renderer.sortObjects = false;
+				//renderer.setSize( window.innerWidth, window.innerHeight );
+				//renderer.setSize( document.getElementById('container').style.pixelWidth , document.getElementById('container').style.pixelHeight ); 
+				renderer.setSize( document.getElementById('container').offsetWidth , document.getElementById('container').offsetHeight  );
+				//set threjs background color 0x1d1d1b
+				renderer.setClearColor( 0x1d1d1b , 1 );
+
+				container.innerHTML = "";
+				
+				var canvasdraft = renderer.domElement;
+				canvasdraft.style.zIndex = 1; 
+				container.appendChild(canvasdraft  );
+				
+			
+				 if( !mIsMobile ) { // Desktops
+					renderer.domElement.addEventListener( 'mousemove', onCanvasMouseMove, false );
+					renderer.domElement.addEventListener( 'mousedown', onCanvasMouseDown, false );
+					renderer.domElement.addEventListener( 'mouseup', onCanvasMouseUp, false );
+				 }else{ //mobiles
+				 	renderer.domElement.addEventListener( 'touchstart', onCanvasMouseDownMobile, false );
+				 	 renderer.domElement.addEventListener( 'touchmove', onCanvasMouseMoveMobile, false );
+				 	 renderer.domElement.addEventListener( 'touchend', onCanvasMouseEndMobile, false );							
+				 }
+	
+				window.addEventListener( 'mousemove', onDocumentMouseMove, false );
+				window.addEventListener( 'mousedown', onDocumentMouseDown, false );
+				window.addEventListener( 'mouseup', onDocumentMouseUp, false );
+				window.addEventListener( 'resize', onWindowResize, false );
+				
+				ShowMenu( false );
+
+			}
+			
+			$( document ).ready(function() {
+				
+	
+				// set canvas color picker size
+				$('.containerMenuColorSelector').show();
+				var CanvasDiv = document.getElementById('ColorPickerDiv');
+				var canvas = document.getElementById('CanvasColorPicker');
+				canvas.width  = CanvasDiv.clientWidth;
+				canvas.height = CanvasDiv.clientHeight; 
+				canvas.style.width  = CanvasDiv.clientWidth+'px';
+				canvas.style.height = CanvasDiv.clientHeight+'px';	
+				var context = canvas.getContext('2d');
+				var imageObj = new Image();
+				imageObj.onload = function() {
+					context.drawImage(imageObj, 0, 0, CanvasDiv.clientWidth, CanvasDiv.clientHeight );
+					$('.containerMenuColorSelector').hide();
+				};
+				imageObj.src = 'images/spectrum.jpg';
+				
+				  $("#slider-rugueux").slider({
+						orientation: "vertical",
+						range: "min",
+						min: 0,
+						max: 100,
+						value: 50,
+						slide: function( event, ui ) {
+							$(this).find('.ui-slider-handle').text(ui.value);
+							mCurrentSelectedEntity.SetDisplacement( ui.value * 2.0 );	
+						},
+						create: function(event, ui) {
+							var v=$(this).slider('value');
+							$(this).find('.ui-slider-handle').text(v);
+						}
+					});  
+					
+					
+				  $("#slider-depth").slider({
+						orientation: "vertical",
+						range: "min",
+						min: 0,
+						max: 100,
+						value: 50,
+						slide: function( event, ui ) {
+							//$(this).find('.ui-slider-handle').text(  Math.round( ui.value )  );
+							//mCurrentSelectedEntity.SetDisplacement( ui.value * 2.0 );	
+							
+ 
+							var scale = (ui.value/100);
+							var scaleValue = scale* 3;
+							 //if( scaleValue < 2.0 && scaleValue > 0.2 ) {
+								if( scaleValue < 2.9 && scaleValue > 0.1 ) {
+								mCurrentSelectedEntity.SetScale( scaleValue, scaleValue ); 
+								mCurrentSelectedEntity.SetAudioGain( scale* 8 );	
+							 }							
+							
+							
+						},
+						create: function(event, ui) {
+							var v=$(this).slider('value');
+							$(this).find('.ui-slider-handle').text(v);
+						}
+					}); 
+					
+							SetSliderRugueuxVisible( false );
+		SetSliderDepthVisible( false );					
+				
+				
+				TINY.box.show({image:'images/accueil.jpg',boxid:'frameless',animate:true,fixed:false,maskid:'blackmask',maskopacity:40 });	
+	 
+			});			
+			
+
+			function onWindowResize() {
+				//camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( document.getElementById('container').offsetWidth , document.getElementById('container').offsetHeight  );
+ 
+				 
+			}
+
+			function animate() {
+ 
+				 requestAnimationFrame( animate );
+				 render();
+
+			}
+			
+			function render() {
+				
+				
+				TWEEN.update();
+
+
+				var delta = clock.getDelta(),
+				time = clock.getElapsedTime() * 5;
+				
+				for( var i = 0 ; i < mEntities.length; i++) {  // video updates if nay
+					mEntities[i].Update();
+				}
+
+	 
+
+				renderer.render( scene, camera );
+
+				camera.updateMatrixWorld();
+				//var p = camera.matrixWorld.getPosition();
+				var p = new THREE.Vector3();
+				p.getPositionFromMatrix( camera.matrixWorld );
+	
+				// And copy the position over to the listener.
+				AudioCtx.listener.setPosition(p.x, p.y, p.z);
+				
+				//AudioCtx.listener.dopplerFactor = 2;
+				//AudioCtx.listener.speedOfSound = 343.3 ;
+				//AudioCtx.listener.setVelocity(0,0,0);
+				
+				
+				// set listener orientation
+				var m = camera.matrix;
+				var mx = m.n14, my = m.n24, mz = m.n34;
+				m.n14 = m.n24 = m.n34 = 0;
+				
+				var vec = new THREE.Vector3(0,0,1);
+				vec.applyMatrix4(m);
+				//m.multiplyVector3(vec);
+				vec.normalize();
+				
+				var up = new THREE.Vector3(0,-1,0);
+				up.applyMatrix4(m);
+				//m.multiplyVector3(up);
+				up.normalize();
+				
+				AudioCtx.listener.setOrientation(vec.x, vec.y, vec.z, up.x, up.y, up.z);
+				
+				m.n14 = mx;
+				m.n24 = my; 
+				m.n34 = mz;
+				//end listener orientation
+				
+		 
+				
+				//The x, y, z parameters represent a front direction vector in 3D space, with the default value being (0,0,-1)
+				//The xUp, yUp, zUp parameters represent an up direction vector in 3D space, with the default value being (0,1,0) 
+				//AudioCtx.listener.setOrientation(0,0,1,0,1,0);
+
+			}
+			
+			
+			function SetNoneSelectedEntities() {
+				for( var i = 0 ; i < mEntities.length; i++ ) {
+					mEntities[i].SetSelected(false);
+				} 
+				
+				mCurrentEditType = EditType.TypeNone; 
+			}
+ 
+			function GetEntity3DFromMesh( msh ) {
+				var ret = null;
+				for( var i = 0 ; i < mEntities.length; i++ ) {
+					if( mEntities[i].mObject3D.mesh1 === msh ) {
+						ret = mEntities[i];
+					}
+				}
+				return ret;
+			}
+			
+			
+			// DOCUMENT MOUSE EVENTS
+			
+			function SetActionsOnClickOrReleased(){ 
+			
+					if( mCurrentEditType === EditType.TypeNone || mCurrentEditType === EditType.TypePosition ) { 
+						OnPosition();
+					}else if( mCurrentEditType === EditType.TypeDepth ){ 
+						//UnSelectAll();
+					}else if( mCurrentEditType === EditType.TypeRugueux ){ 
+						//UnSelectAll();
+					}
+ 
+			}
+			
+			function handleColorPickerClick( event ) {
+				
+				if( mCurrentEditType === EditType.TypeColor ) {
+					$('.containerMenuColorSelector').hide();
+					mCurrentEditType = EditType.TypeNone;
+					UnSelectAll();
+				}	
+			}
+			
+			function handleColorPickerMouseMove( event ) {
+				if( mCurrentSelectedEntity === null ) return; 
+				if( mCurrentEditType === EditType.TypeColor ) {
+					var CanvasColor = document.getElementById('CanvasColorPicker');
+					var pixelData =  CanvasColor.getContext('2d').getImageData(  event.offsetX, event.offsetY, 1, 1).data;
+        			// console.log('R: ' + pixelData[0] + '<br>G: ' + pixelData[1] + '<br>B: ' + pixelData[2] + '<br>A: ' + pixelData[3]);
+					mCurrentSelectedEntity.SetVideoColor( pixelData[0] , pixelData[1], pixelData[2]) ;	
+				}
+			}			
+
+			function onDocumentMouseDown( event ) { 
+			
+				//mCurrentEditType === EditType.TypeNone;
+				SetActionsOnClickOrReleased(); 
+			}
+			
+			function onDocumentMouseUp( event ) {
+
+				//mCurrentEditType === EditType.TypeNone;
+				//if( INTERSECTED )
+			}
+
+			function onDocumentMouseMove( event ) { 
+			
+				if(  mCurrentSelectedEntity === null ) return;
+				
+				var posx = event.clientX;
+				var posy = event.clientY;
+				
+				if( mCurrentEditType === EditType.TypeDepth ) { //DEPTH
+					/* position if needed var pos = mCurrentSelectedEntity.GetObjectPosition();
+					var Z = posy;
+					mCurrentSelectedEntity.SetPosition( new THREE.Vector3( pos.x, pos.y, -posy*10.0 ) ); 
+					mCurrentSelectedEntity.OnEntityMoved();*/
+					
+					var value = mCurrentSelectedEntity.GetAudioGain() / 8;
+					SetSliderDepthValue( value * 100 ) ;
+					
+					
+					//var scale = (posy / window.innerHeight) ;
+					//var scaleValue = scale* 3;
+	
+					//if( scaleValue < 2.0 && scaleValue > 0.2 ) {
+					//	mCurrentSelectedEntity.SetScale( scaleValue, scaleValue ); 
+					//	mCurrentSelectedEntity.SetAudioGain( scale* 10 );	
+					//}
+					
+				
+				}
+				/*else if( mCurrentEditType === EditType.TypeRugueux ) {
+					var displacement = (posy / window.innerHeight ) * 200;
+					console.log( 'Set Displacement : ' + displacement );
+					mCurrentSelectedEntity.SetDisplacement( displacement );	
+				}*/
+			}
+			
+			 
+			// CANVAS MOBILE MOUSE EVENTS
+			
+			function onCanvasMouseDownMobile( event ) {
+				
+				if ( event.targetTouches.length == 1 ) {
+					var touch = event.targetTouches[0];
+ 
+					var cont = document.getElementById( 'container' );
+					var posx = touch.clientX - getPosition( cont )[0];
+					var posy = touch.clientY - getPosition( cont )[1];
+					var width = cont.offsetWidth;
+					var height = cont.offsetHeight;
+					var posInScreenX = ( mSceneWidth / width ) * posx;
+					var posInScreenY = ( mSceneHeight / height ) * posy;
+					mouse.x = ( posInScreenX/mSceneWidth ) * 2 - 1;
+					mouse.y = - ( posInScreenY/mSceneHeight ) * 2 + 1;						
+ 
+					var vector = new THREE.Vector3( mouse.x, mouse.y, 0.5 );
+					projector.unprojectVector( vector, camera );
+					var raycaster = new THREE.Raycaster( camera.position, vector.sub( camera.position ).normalize() );
+					var intersects = raycaster.intersectObjects( objects );
+	
+					if ( intersects.length > 0 ) {
+						SELECTED = intersects[ 0 ].object;
+						/*
+						var intersects = raycaster.intersectObject( plane );
+						offset.copy( intersects[ 0 ].point ).sub( plane.position );*/
+						container.style.cursor = 'move';
+						
+						  if( mCurrentEditType === EditType.TypeNone ) {
+							  //mCurrentEditType = EditType.TypePosition;
+							  OnPosition();
+							  
+							 }
+						mCurrentSelectedEntity = GetEntity3DFromMesh( SELECTED );
+						mCurrentSelectedEntity.SetSelected( true );
+						ShowMenu( true );
+					}else {
+						mCurrentSelectedEntity = null;
+						SetNoneSelectedEntities();
+						ShowMenu( false );
+					}
+				}	
+			}
+ 
+			function onCanvasMouseMoveMobile( event ) {
+				
+				event.preventDefault();
+				if ( event.targetTouches.length == 1 ) {
+					var touch = event.targetTouches[0];
+ 
+					if ( SELECTED ) {
+						  if( mCurrentEditType === EditType.TypePosition ) {
+							  
+							  //var position = intersects[ 0 ].point.sub( offset );
+							  var Z = mCurrentSelectedEntity.GetObjectPosition().z;
+							  //keep current z while moving..
+							  //mCurrentSelectedEntity.SetPosition( new THREE.Vector3( position.x, position.y,  Z )  );//intersects[ 0 ].point.sub( offset ) );
+							  mCurrentSelectedEntity.SetPosition( new THREE.Vector3( touch.screenX, touch.screenY ,  Z )  );
+							  //mCurrentSelectedEntity.SetPosition( new THREE.Vector3( posInScreenX, posInScreenY,  Z )  );
+							  //mCurrentSelectedEntity.OnUpdate();
+							  mCurrentSelectedEntity.OnEntityMoved();	
+						  }else { /*console.log( '  not position : ' + mCurrentEditType );*/ }
+						return;
+					}
+	
+					var intersects = raycaster.intersectObjects( objects );
+	
+					if ( intersects.length > 0 ) {
+						if ( INTERSECTED != intersects[ 0 ].object ) {
+							//if ( INTERSECTED ) INTERSECTED.material.color.setHex( INTERSECTED.currentHex );
+							INTERSECTED = intersects[ 0 ].object;
+							//INTERSECTED.currentHex = INTERSECTED.material.color.getHex();
+							plane.position.copy( INTERSECTED.position );
+							plane.lookAt( camera.position );
+						}
+						container.style.cursor = 'pointer';
+	
+					} else { // no results
+						//if ( INTERSECTED ) INTERSECTED.material.color.setHex( INTERSECTED.currentHex );
+						INTERSECTED = null;
+						container.style.cursor = 'auto';
+	
+					}		
+				
+				}		
+				
+			}
+			
+			function onCanvasMouseEndMobile( event ) {
+				
+			}
+			
+			// CANVAS DESKTOP MOUSE EVENTS
+			function onCanvasMouseDown( event ) {
+				event.preventDefault();
+				if( isfullscreen === true ) {
+					 SetFullScreen( false )
+				}
+				
+				
+				//console.log('touching : X: '+ mouse.x +'  Y: ' + mouse.y );
+ 
+				var vector = new THREE.Vector3( mouse.x, mouse.y, 0.5 );
+				projector.unprojectVector( vector, camera );
+				var raycaster = new THREE.Raycaster( camera.position, vector.sub( camera.position ).normalize() );
+				var intersects = raycaster.intersectObjects( objects );
+
+				if ( intersects.length > 0 ) {
+					SELECTED = intersects[ 0 ].object;
+					
+					//calculate offset for mouse 
+					var intersectplane = raycaster.intersectObject( plane );
+					offset.copy( intersectplane[ 0 ].point ).sub( plane.position ); 
+					
+					container.style.cursor = 'move';
+					
+					SetActionsOnClickOrReleased();
+
+					mCurrentSelectedEntity = GetEntity3DFromMesh( SELECTED );
+					if( mCurrentSelectedEntity != null ){ 
+						mCurrentSelectedEntity.SetSelected( true );
+						ShowMenu( true );
+						SetSliderRugueuxValue( mCurrentSelectedEntity.GetDisplacement()/2.0 );
+						console.log("debug : onCanvasMouseDown is selected");
+					}else{ 
+						console.log("debug : onCanvasMouseDown mCurrentSelectedEntity is null");
+					}
+
+				}else {
+					mCurrentSelectedEntity = null;
+					SetNoneSelectedEntities();
+					ShowMenu( false );
+					UnSelectAll();
+				}
+			}
+			
+			function onCanvasMouseMove( event ) {
+ 
+				event.preventDefault();
+				var cont = document.getElementById( 'container' );
+				var posx = event.clientX - getPosition( cont )[0];
+				var posy = event.clientY - getPosition( cont )[1];
+				var width = cont.offsetWidth;
+				var height = cont.offsetHeight;
+				var posInScreenX = ( mSceneWidth / width ) * posx;
+				var posInScreenY = ( mSceneHeight / height ) * posy;
+				
+				mouse.x = ( posInScreenX/mSceneWidth ) * 2 - 1;
+				mouse.y = - ( posInScreenY/mSceneHeight ) * 2 + 1;	 
+	 
+
+				var vector = new THREE.Vector3( mouse.x, mouse.y, 0.5 );
+				projector.unprojectVector( vector, camera );
+				var raycaster = new THREE.Raycaster( camera.position, vector.sub( camera.position ).normalize() );
+				
+				
+				if ( SELECTED ) {
+					var intersects = raycaster.intersectObject( plane );
+					
+						  if( mCurrentEditType === EditType.TypePosition ) {
+ 
+							  if ( intersects.length > 0 ) {
+								  var position = intersects[ 0 ].point.sub( offset );
+								  if( mCurrentSelectedEntity != null ){ 
+								  	 console.log("debug : onCanvasMouseMove mCurrentSelectedEntity started");
+									  var Z = mCurrentSelectedEntity.GetObjectPosition().z;
+									  //keep current z while moving..
+									  mCurrentSelectedEntity.SetPosition( new THREE.Vector3( position.x, position.y, Z ) );//intersects[ 0 ].point.sub( offset ) );
+									  //mCurrentSelectedEntity.OnUpdate();
+									  mCurrentSelectedEntity.OnEntityMoved();
+								  }else{ 
+								  	console.log("Debug : onCanvasMouseMove is null");
+								  }
+							  }	
+						  }else { /*console.log( '  not position : ' + mCurrentEditType );*/ }
+					return;
+				}
+
+				var intersects = raycaster.intersectObjects( objects );
+
+				if ( intersects.length > 0 ) {
+					if ( INTERSECTED != intersects[ 0 ].object ) {
+ 
+						INTERSECTED = intersects[ 0 ].object;
+			 
+						plane.position.copy( INTERSECTED.position );
+						plane.lookAt( camera.position );
+					}
+					container.style.cursor = 'pointer';
+
+				} else { // no results
+		 
+					INTERSECTED = null;
+					container.style.cursor = 'auto';
+
+				} 
+
+			}
+ 
+		function onCanvasMouseUp( event ) {
+			event.preventDefault();
+			if ( INTERSECTED ) {
+				plane.position.copy( INTERSECTED.position );
+				SELECTED = null;
+			}
+			container.style.cursor = 'auto';
+		}	
+
+		/*  DELETE EVENTS  */	
+		function handleIconMouseMove(evt) {
+			var elem = evt.relatedTarget || evt.toElement || evt.fromElement;
+			// entity released out canvas, show delete
+			if( mCurrentSelectedEntity != null  )
+				elem.style.cursor = 'crosshair';
+        }				
+
+		function handleIconMouseUp(evt) {
+ 			// entity released out canvas, delete it
+			if( mCurrentSelectedEntity != null  ){ 
+				SELECTED = null;
+				DeleteElement( mCurrentSelectedEntity );
+				mCurrentSelectedEntity = null;
+				ShowMenu( false );
+				SetSliderRugueuxVisible( false );
+				SetSliderDepthVisible( false );
+				
+			}
+        }			
+
+		</script>
+
+	</body>
+</html>

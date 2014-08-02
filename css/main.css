@@ -1,0 +1,263 @@
+/* Prevent the text contents of draggable elements from being selectable. */
+[draggable] {
+	-moz-user-select: none;
+	-khtml-user-select: none;
+	-webkit-user-select: none;
+	user-select: none;
+	/* Required to make elements draggable in old WebKit */
+	-khtml-user-drag: element;
+	-webkit-user-drag: element;
+}		
+		
+*{
+	padding: 0px;	
+}
+
+:focus { 
+	outline:none;
+}
+
+::-moz-focus-inner {
+	border:0;
+}		
+		
+html {
+	height:100%;
+}
+		
+body { 
+	background-color: #4a4a48;
+	overflow:hidden;
+	font-family:Monospace;
+	font-size:13px;
+	text-align:center;
+	font-weight: bold;
+	text-align:center;
+}
+
+button {
+    background-color:rgba(0, 0, 0, 0.2);
+    border: none !important;
+	font-size:18px;
+	color:#FFF;
+}​
+
+a {
+	color:#0078ff;
+}
+			
+.mainframe {
+	position:absolute;
+	top:0;
+	left:0;
+	width: 100%;
+	height:100%;
+	background:#4a4a48;
+	text-align:center;
+}
+	
+.containerholder {
+	position:absolute;
+	top:0;
+	left:1%;
+	width: 98%; 	 
+	height: 77%; 
+	/*margin: 1% auto;*/ 
+	
+	margin-top:1%;
+	margin-bottom:0%;
+	margin-right:auto;
+	margin-left:auto;		 
+	z-index:1;
+}
+
+#container {
+	position:relative;
+	float:left;
+	width: 83%;
+	height:96%;
+	margin-left:  0px;	
+	margin-top: 0px;	
+	margin-right: +4px;	
+	margin-bottom: 0px;	 
+	z-index:1;
+	outline:2px solid white;
+	outline-offset:1px;
+	overflow:visible;
+}
+
+#slider-rugueux {
+	position:absolute;
+	float:left;
+	left:0;
+	top:-0.5%;
+	z-index:20;
+	width:40px; 
+	height: 147%;
+}
+
+#slider-depth {
+	position:absolute;
+	float:left;
+	left:0;
+	top:-0.5%;
+	z-index:20;
+	width:40px; 
+	height: 147%;
+}
+
+.containerInfo { 
+	position:absolute;
+	float:right;
+	right:0;
+	top:0;
+	width:16%;
+	height:3%; 
+}
+ 
+.ui-slider { position: absolute; text-align: left; }
+.ui-slider-vertical {  background-color:#000000; outline:2px solid white; outline-offset:1px; }
+.ui-slider-vertical .ui-slider-range { left: 0; width: 100%;  }
+.ui-slider-vertical .ui-slider-range-min { bottom: 0; }
+.ui-slider-vertical .ui-slider-range-max { top: 0; }
+.ui-slider .ui-slider-handle { 
+	outline:1px solid white;
+	font-size: 1em;
+	text-align:center;
+	margin-bottom:-25px;
+	position: absolute;
+	z-index: 2;
+	width: 41px;
+	height: 50px;
+	cursor: default;
+	background-color:#CCC;
+} 
+
+.containerMenu {
+	position:absolute;
+	right:0;
+	top:4%;
+	float:right;
+	width:16%; /*14%*/
+	height:60%;/* 35% */
+	z-index:10;
+}
+
+.containerMenuColorSelector {
+	position:absolute;
+	right:0;
+	top:35%;
+	float:right;
+	width:14%;
+	height:20%;
+	z-index:10;
+}
+
+.button_rugeux {
+	position:absolute;
+	width: 41%; 
+	height: 30%;
+	top: 0;
+	right: 30%;			
+	background: url('../images/buttons/rugeux.png') no-repeat;
+	background-size:contain;
+	border:none;
+	overflow:visible;
+}
+
+.button_scale {
+	position:absolute;
+	width: 41%; 
+	height: 30%;
+	top:24%;
+	right:55%;
+	background: url('../images/buttons/depth.png') no-repeat;
+	background-size:contain;
+	border:none;
+	overflow:visible;
+}
+
+.button_position {
+	position:absolute;
+	width: 41%; 
+	height: 30%;
+	top:24%;
+	right:6%;
+	
+	background: url('../images/buttons/position.png') no-repeat;
+	background-size:contain;
+	border:none;
+	overflow:visible;
+}
+
+.button_color {
+	position:absolute;
+	width: 41%; 
+	height: 30%;
+	top: 48%;
+	right: 30%;				
+	background: url('../images/buttons/color.png') no-repeat;
+	background-size:contain;
+	border:none;
+	overflow:visible;
+}
+
+.button_play {
+	position:absolute;
+	width: 40%; 
+	height: 30%;
+	top: 80%;
+	right: 30%;			
+	background: url('../images/buttons/play.png') no-repeat;
+	background-size:contain;
+	border:none;
+}
+
+.bottomframe {
+	position:absolute;
+	width: 99.5%;
+	height: 16%;
+	background: linear-gradient(#1d1d1b, #6d6d6b);
+	bottom:3%;
+	text-align:center;
+	border: 3px solid #FFFFFF;
+}
+
+.menubottomframe { 
+	position:relative;
+	width:90%;
+	height:100%;
+	display:inline-block;
+	list-style-type: none;	
+}
+
+.drag {
+	display:inline-block;
+	z-index:500;
+}
+	
+.delete {
+	display:inline-block;
+	z-index:500;	
+}
+
+ul li {
+	position: relative;
+	width:10%;
+	height:99%;
+	float: left;
+	white-space: nowrap;
+	padding-left: 0.5%;
+	padding-right: 0.5%;
+}
+
+ul li a {
+   width: 90%;
+   height:90%;
+  
+}
+
+ul li img {
+	width: 90%;
+	height:90%; 
+}
